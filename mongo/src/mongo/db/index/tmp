@@ -1,0 +1,53 @@
+// Find the keys for obj, put them in the tree pointing to loc
+Status IndexAccessMethod::insert(OperationContext* txn,
+                                 const BSONObj& obj,
+                                 const RecordId& loc,
+                                 const InsertDeleteOptions& options,
+                                 int64_t* numInserted) {
+    *numInserted = 0;
+
+    BSONObjSet keys;
+    // Delegate to the subclass.
+    getKeys(obj, &keys);
+
+    Status ret = Status::OK();
+    for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
+        Status status = _newInterface->insert(txn, *i, loc, options.dupsAllowed);
+
+        // Everything's OK, carry on.
+        if (status.isOK()) {
+            ++*numInserted;
+            continue;
+        }
+
+        // Error cases.
+
+        if (status.code() == ErrorCodes::KeyTooLong && ignoreKeyTooLong(txn)) {
+            continue;
+        }
+
+        if (status.code() == ErrorCodes::DuplicateKeyValue) {
+            // A document might be indexed multiple times during a background index build
+            // if it moves ahead of the collection scan cursor (e.g. via an update).
+            if (!_btreeState->isReady(txn)) {
+                LOG(3) << "key " << *i << " already in index during background indexing (ok)";
+                continue;
+            }
+        }
+
+        // Clean up after ourselves.
+        for (BSONObjSet::const_iterator j = keys.begin(); j != i; ++j) {
+            removeOneKey(txn, *j, loc, options.dupsAllowed);
+            *numInserted = 0;
+        }
+
+        return status;
+    }
+
+    if (*numInserted > 1) {
+        _btreeState->setMultikey(txn);
+    }
+
+    return ret;
+}
+
