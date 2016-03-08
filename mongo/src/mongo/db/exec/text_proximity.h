@@ -33,6 +33,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/text.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/matcher/expression.h"
@@ -62,7 +63,7 @@ public:
         // 1. Initialize the _recordCursor.
         kInit,
 
-        // 2. Read the terms/recordId/pos from the text index.
+        // 2. Read the terms/recId/pos from the text index.
         kReadingTerms,
 
         // 3. Return results to our parent.
@@ -73,16 +74,14 @@ public:
     };
 
     TextProximityStage(OperationContext* txn,
-                       const FTSSpec& ftsSpec,
+                       const TextStageParams& params,
                        WorkingSet* ws,
                        const MatchExpression* filter,
-                       IndexDescriptor* index,
                        uint32_t proximityWindow);
 
     ~TextProximityStage();
 
     void addChild(unique_ptr<PlanStage> child);
-
     bool isEOF() final;
     StageState doWork(WorkingSetID* out) final;
     void doSaveState() final;
@@ -101,6 +100,16 @@ public:
     static const char* kStageType;
 
 private:
+    // Temporary score data filled out by children.
+    struct TextRecordData {
+        TextRecordData() : wsid(WorkingSet::INVALID_ID), rejected(false), recId(0), pos(0) {}
+        WorkingSetID wsid;
+        bool rejected;
+        std::string term;
+        uint64_t recId;
+        uint32_t pos;
+    };
+
     /**
      * Worker for kInit.
      * Initializes the _recordCursor member and handles the potential for
@@ -110,7 +119,7 @@ private:
 
     /**
      * Worker for kReadingTerms.
-     * Reads from the children, searching for matching (recordId, pos)
+     * Reads from the children, searching for matching (recId, pos)
      */
     StageState readFromChildren(WorkingSetID* out);
 
@@ -124,30 +133,30 @@ private:
      */
     StageState returnResults(WorkingSetID* out);
 
-    FTSSpec _ftsSpec;
+    /**
+     * Sort _posMap into _posv.
+     */
+    void collectResults();
+    static bool proximitySort(TextRecordData&, TextRecordData&);
+
+    // State.
+    const TextStageParams& _params;
     WorkingSet* _ws;
     State _internalState = State::kInit;
     size_t _currentChild = 0;
-
-    // Temporary score data filled out by children.
-    struct TextRecordData {
-        TextRecordData() : wsid(WorkingSet::INVALID_ID), recordId(0), pos(0) {}
-        WorkingSetID wsid;
-        std::string term;
-        uint64_t recordId;
-        uint32_t pos;
-    };
+    uint32_t _proximityWindow;
 
     typedef unordered_map<RecordId, TextRecordData, RecordId::Hasher> PositionMap;
     PositionMap _posMap;
-    PositionMap::const_iterator _posMapIterator;
+
+    std::vector<TextRecordData> _posv;
+    std::vector<WorkingSetID> _resultSet;
+    std::vector<WorkingSetID>::const_iterator _resultSetIterator;
 
     // Members needed only for using the TextMatchableDocument.
     const MatchExpression* _filter;
     WorkingSetID _idRetrying;
     std::unique_ptr<SeekableRecordCursor> _recordCursor;
-    IndexDescriptor* _index;
-    uint32_t _proximityWindow;
 
     // Stats.
     TextProximityStats _specificStats;

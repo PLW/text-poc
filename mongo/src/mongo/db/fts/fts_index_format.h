@@ -34,6 +34,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/fts/fts_util.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 
@@ -43,10 +44,23 @@ class FTSSpec;
 
 class FTSIndexFormat {
 public:
-    static void getKeys(const FTSSpec& spec, const BSONObj& document, BSONObjSet* keys);
+    static void getKeys(
+        const FTSSpec& spec,
+        const BSONObj& document,
+        BSONObjSet* keys);
+
+    static void getKeys2(
+        const FTSSpec& spec,
+        const BSONObj& document,
+        BSONObjSet* keys,
+        const RecordId& loc);
 
     // @@@proximity
-    static void getKeysProximity(const FTSSpec& spec, const BSONObj& obj, BSONObjSet* keys);
+    static void getKeysProximity(
+        const FTSSpec& spec,
+        const BSONObj& obj,
+        BSONObjSet* keys,
+        const RecordId& loc);
 
     /**
      * Helper method to get return entry from the FTSIndex as a BSONObj

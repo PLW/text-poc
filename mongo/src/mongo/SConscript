@@ -156,6 +156,7 @@ module_list = '{ %s }' % ', '.join([ '"{0}"'.format(x) for x in env['MONGO_MODUL
 # 3.1.1-rc2-123 = 3010103
 # 3.1.1         = 3010199
 #
+env['MONGO_VERSION'] = "3.3.2-77-g81efb31"
 version_parts = [ x for x in re.match(r'^(\d+)\.(\d+)\.(\d+)-?((?:(rc)(\d+))?.*)?',
     env['MONGO_VERSION']).groups() ]
 version_extra = version_parts[3] if version_parts[3] else ""

@@ -55,7 +55,8 @@ Status FTSAccessMethod::insert(OperationContext* txn,
     BSONObjSet keys;
 
     // Delegate to the subclass.
-    getKeys(obj, &keys);
+    //getKeys(obj, &keys);
+    ExpressionKeysPrivate::getFTSKeys2(obj, _ftsSpec, &keys, loc);
 
     Status ret = Status::OK();
     for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {

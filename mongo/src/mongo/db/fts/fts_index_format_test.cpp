@@ -36,6 +36,7 @@
 
 #include "mongo/db/fts/fts_index_format.h"
 #include "mongo/db/fts/fts_spec.h"
+#include "mongo/db/record_id.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/unittest/unittest.h"
@@ -72,7 +73,8 @@ TEST(FTSIndexFormat, Proximity1) {
             "data" << "The cat with a hat sat, and the cat with no hat sat in the middle of the flat." <<
             "body" << "The rat with a gat sat in the corner of the flat."
         ),
-        &keys);
+        &keys,
+        RecordId(0,103));
 
     for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
         BSONObj key = *i;

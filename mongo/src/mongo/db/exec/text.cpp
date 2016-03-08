@@ -134,7 +134,7 @@ unique_ptr<PlanStage> TextStage::buildTextProximityTree(
     uint32_t proximityWindow) const
 {
     auto proximityStage =
-        make_unique<TextProximityStage>(txn, _params.spec, ws, filter, _params.index, proximityWindow);
+        make_unique<TextProximityStage>(txn, _params, ws, filter, proximityWindow);
 
     // Get all the index scans for each term in our query.
     for (const auto& term : _params.query.getTermsForBounds()) {

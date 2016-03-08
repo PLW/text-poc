@@ -89,6 +89,30 @@ ExtensionsCallback::extractTextMatchExpressionParams(BSONElement text) {
         expectedFieldCount++;
     }
 
+    // @@@proximity
+    long long n;
+    Status proximityStatus = bsonExtractIntegerField(queryObj, "$proximity", &n);
+    params.proximityWindow = n;
+    if (proximityStatus == ErrorCodes::TypeMismatch) {
+        return proximityStatus;
+    } else if (proximityStatus == ErrorCodes::NoSuchKey) {
+        params.proximityWindow = TextMatchExpressionBase::kProximityWindowDefault;
+    } else {
+        invariantOK(proximityStatus);
+        expectedFieldCount++;
+    }
+
+    Status reorderStatus = bsonExtractIntegerField(queryObj, "$reorder", &n);
+    params.reorder = n;
+    if (reorderStatus == ErrorCodes::TypeMismatch) {
+        return reorderStatus;
+    } else if (reorderStatus == ErrorCodes::NoSuchKey) {
+        params.reorder = TextMatchExpressionBase::kReorderDefault;
+    } else {
+        invariantOK(reorderStatus);
+        expectedFieldCount++;
+    }
+
     if (queryObj.nFields() != expectedFieldCount) {
         return {ErrorCodes::BadValue, "extra fields in $text"};
     }

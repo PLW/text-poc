@@ -28,6 +28,7 @@
 
 #include "mongo/db/exec/text_or.h"
 
+#include <iostream>
 #include <map>
 #include <vector>
 
@@ -65,7 +66,9 @@ TextOrStage::TextOrStage(OperationContext* txn,
       _scoreIterator(_scores.end()),
       _filter(filter),
       _idRetrying(WorkingSet::INVALID_ID),
-      _index(index) {}
+      _index(index) {
+    std::cout << "debug" << std::endl;
+}
 
 TextOrStage::~TextOrStage() {}
 

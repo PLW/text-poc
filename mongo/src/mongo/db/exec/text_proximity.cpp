@@ -30,6 +30,7 @@
 
 #include <map>
 #include <vector>
+#include <algorithm>
 
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/index_scan.h"
@@ -55,18 +56,16 @@ using fts::FTSSpec;
 const char* TextProximityStage::kStageType = "TEXT_PROXIMITY";
 
 TextProximityStage::TextProximityStage(OperationContext* txn,
-                                       const FTSSpec& ftsSpec,
+                                       const TextStageParams& params,
                                        WorkingSet* ws,
                                        const MatchExpression* filter,
-                                       IndexDescriptor* index,
                                        uint32_t proximityWindow)
     : PlanStage(kStageType, txn),
-      _ftsSpec(ftsSpec),
+      _params(params),
       _ws(ws),
+      _proximityWindow(proximityWindow),
       _filter(filter),
-      _idRetrying(WorkingSet::INVALID_ID),
-      _index(index),
-      _proximityWindow(proximityWindow) {}
+      _idRetrying(WorkingSet::INVALID_ID) {}
 
 TextProximityStage::~TextProximityStage() {}
 
@@ -156,7 +155,7 @@ PlanStage::StageState TextProximityStage::doWork(WorkingSetID* out) {
 PlanStage::StageState TextProximityStage::initStage(WorkingSetID* out) {
     *out = WorkingSet::INVALID_ID;
     try {
-        _recordCursor = _index->getCollection()->getCursor(getOpCtx());
+        _recordCursor = _params.index->getCollection()->getCursor(getOpCtx());
         _internalState = State::kReadingTerms;
         return PlanStage::NEED_TIME;
     } catch (const WriteConflictException& wce) {
@@ -202,6 +201,8 @@ PlanStage::StageState TextProximityStage::readFromChildren(WorkingSetID* out) {
         }
 
         // If we're here we are done reading results.  Move to the next state.
+        collectResults();
+        _resultSetIterator = _resultSet.begin();
         _internalState = State::kReturningResults;
 
         return PlanStage::NEED_TIME;
@@ -228,27 +229,63 @@ PlanStage::StageState TextProximityStage::readFromChildren(WorkingSetID* out) {
     }
 }
 
+bool TextProximityStage::proximitySort(TextRecordData& x, TextRecordData& y) {
+    if (x.recId < y.recId) return true;
+    if (x.recId > y.recId) return false;
+    if (x.pos < y.pos) return true;
+    return false;
+}
+
+void TextProximityStage::collectResults() {
+
+    std::sort(_posv.begin(), _posv.end(), proximitySort);
+
+    uint64_t recId = 0;
+    std::vector<TextRecordData> recv;
+
+    std::vector<TextRecordData>::const_iterator it2;
+    for (it2 = _posv.begin(); it2 != _posv.end(); ++it2) {
+
+        if (it2->recId != recId) {
+            // we have a run of common recordId's
+
+            uint32_t nterms = _params.query.getTermsForBounds().size();
+
+            // scan for all terms within _proximityWindow
+            std::vector<TextRecordData>::const_iterator it3;
+            for (it3 = recv.begin(); it3 != recv.end(); ++it3) {
+
+                std::set<std::string> terms;
+                uint32_t width = 0;
+                uint32_t pos = it3->pos;
+
+                std::vector<TextRecordData>::const_iterator it4;
+                for (it4 = it3; it4 != recv.end() && width < _proximityWindow; ++it4) {
+                    width += (it4->pos - pos);
+                    terms.insert(it4->term);
+                    if (terms.size() == nterms) {
+                        _resultSet.push_back(it4->wsid);
+                        break;
+                    }
+                }
+                
+            }
+            recId = it2->recId;
+            recv.clear();
+        } else {
+            recv.push_back(*it2);
+        }
+
+    }
+}
+
 PlanStage::StageState TextProximityStage::returnResults(WorkingSetID* out) {
-    if (_posMapIterator == _posMap.end()) {
+    if (_resultSetIterator == _resultSet.end()) {
         _internalState = State::kDone;
         return PlanStage::IS_EOF;
     }
-
-    // Retrieve the record that contains the text score.
-    TextRecordData textRecordData = _posMapIterator->second;
-    ++_posMapIterator;
-
-    // Ignore non-matched documents.
-    //if (textRecordData.score < 0) {
-    //    invariant(textRecordData.wsid == WorkingSet::INVALID_ID);
-    //    return PlanStage::NEED_TIME;
-    //}
-
-    //WorkingSetMember* wsm = _ws->get(textRecordData.wsid);
-
-    // Populate the working set member
-    //wsm->addComputed(new TextScoreComputedData(textRecordData.score));
-    *out = textRecordData.wsid;
+    *out = *_resultSetIterator;
+    ++_resultSetIterator;
     return PlanStage::ADVANCED;
 }
 
@@ -334,12 +371,12 @@ PlanStage::StageState TextProximityStage::addTerm(WorkingSetID wsid, WorkingSetI
     const IndexKeyDatum newKeyData = wsm->keyData.back();  // copy to keep it around.
     TextRecordData* textRecordData = &_posMap[wsm->recordId];
 
-    //if (textRecordData->score < 0) {
-    //    // We have already rejected this document for not matching the filter.
-    //    invariant(WorkingSet::INVALID_ID == textRecordData->wsid);
-    //    _ws->free(wsid);
-    //    return NEED_TIME;
-    //}
+    if (textRecordData->rejected) {
+        // We rejected this document for not matching the filter.
+        invariant(WorkingSet::INVALID_ID == textRecordData->wsid);
+        _ws->free(wsid);
+        return NEED_TIME;
+    }
 
     if (WorkingSet::INVALID_ID == textRecordData->wsid) {
         // We haven't seen this RecordId before.
@@ -376,8 +413,7 @@ PlanStage::StageState TextProximityStage::addTerm(WorkingSetID wsid, WorkingSetI
         }
 
         if (shouldKeep && !wsm->hasObj()) {
-            // Our parent expects RID_AND_OBJ members, so we fetch the document here if we haven't
-            // already.
+            // Our parent expects RID_AND_OBJ members: fetch the document if we haven't already.
             try {
                 shouldKeep = WorkingSetCommon::fetch(getOpCtx(), _ws, wsid, _recordCursor);
                 ++_specificStats.fetches;
@@ -391,7 +427,7 @@ PlanStage::StageState TextProximityStage::addTerm(WorkingSetID wsid, WorkingSetI
 
         if (!shouldKeep) {
             _ws->free(wsid);
-            //textRecordData->score = -1;
+            textRecordData->rejected = true;
             return NEED_TIME;
         }
 
@@ -399,6 +435,7 @@ PlanStage::StageState TextProximityStage::addTerm(WorkingSetID wsid, WorkingSetI
 
         // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
         wsm->makeObjOwnedIfNeeded();
+
     } else {
         // We already have a working set member for this RecordId. Free the new WSM and retrieve the
         // old one. Note that since we don't keep all index keys, we could get a score that doesn't
@@ -411,23 +448,26 @@ PlanStage::StageState TextProximityStage::addTerm(WorkingSetID wsid, WorkingSetI
 
     // compound key {prefix,term,recordId,pos}.
     BSONObjIterator keyIt(newKeyData.keyData);
-    for (unsigned i = 0; i < _ftsSpec.numExtraBefore(); i++) {
+    for (unsigned i = 0; i < _params.spec.numExtraBefore(); i++) {
         keyIt.next();
     }
 
     BSONElement termElement = keyIt.next();
     std::string term = termElement.String();
 
-    BSONElement recordIdElement = keyIt.next();
-    uint64_t recordId = (uint64_t)recordIdElement.Long();
+    BSONElement recIdElement = keyIt.next();
+    uint64_t recId = (uint64_t)recIdElement.Long();
 
     BSONElement posElement = keyIt.next();
     uint32_t pos = (uint32_t)posElement.Int();
 
     // Aggregate {term,recordId,pos}
     textRecordData->term = term;
-    textRecordData->recordId = recordId;
+    textRecordData->recId = recId;
     textRecordData->pos = pos;
+
+    _posv.push_back(*textRecordData);
+    std::cout << "textRecordData(" << term << ", " << recId << ", " << pos << ")" <<std::endl;
 
     return NEED_TIME;
 }

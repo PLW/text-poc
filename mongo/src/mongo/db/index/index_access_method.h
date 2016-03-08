@@ -77,7 +77,8 @@ public:
      *
      * The behavior of the insertion can be specified through 'options'.
      */
-    Status insert(OperationContext* txn,
+    // @@@proximity
+    virtual Status insert(OperationContext* txn,
                   const BSONObj& obj,
                   const RecordId& loc,
                   const InsertDeleteOptions& options,

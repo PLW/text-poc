@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/hasher.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 
@@ -52,24 +53,26 @@ class FTSSpec;
  */
 class ExpressionKeysPrivate {
 public:
-    //
-    // 2d
-    //
 
+    /**
+     * Generates keys for geo 2D access method.
+     */
     static void get2DKeys(const BSONObj& obj,
                           const TwoDIndexingParams& params,
                           BSONObjSet* keys,
                           std::vector<BSONObj>* locs);
 
-    //
-    // FTS
-    //
-
+    /**
+     * Generates keys for fts access method.
+     */
     static void getFTSKeys(const BSONObj& obj, const fts::FTSSpec& ftsSpec, BSONObjSet* keys);
 
-    //
-    // Hash
-    //
+    // @@@proximity
+    static void getFTSKeys2(
+        const BSONObj& obj,
+        const fts::FTSSpec& ftsSpec,
+        BSONObjSet* keys,
+        const RecordId& loc);
 
     /**
      * Generates keys for hash access method.
@@ -87,10 +90,6 @@ public:
      * so mongo/db/index_legacy.cpp can use it.
      */
     static long long int makeSingleHashKey(const BSONElement& e, HashSeed seed, int v);
-
-    //
-    // Haystack
-    //
 
     /**
      * Generates keys for haystack access method.
@@ -112,10 +111,6 @@ public:
      * Used by getHaystackKeys and HaystackAccessMethod::searchCommand.
      */
     static std::string makeHaystackString(int hashedX, int hashedY);
-
-    //
-    // S2
-    //
 
     /**
      * Generates keys for S2 access method.

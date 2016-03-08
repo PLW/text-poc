@@ -37,6 +37,10 @@ namespace mongo {
 const bool TextMatchExpressionBase::kCaseSensitiveDefault = false;
 const bool TextMatchExpressionBase::kDiacriticSensitiveDefault = false;
 
+// @@@proximity
+const int TextMatchExpressionBase::kProximityWindowDefault = -1;
+const int TextMatchExpressionBase::kReorderDefault = -1;
+
 TextMatchExpressionBase::TextMatchExpressionBase() : LeafMatchExpression(TEXT) {}
 
 void TextMatchExpressionBase::debugString(StringBuilder& debug, int level) const {
