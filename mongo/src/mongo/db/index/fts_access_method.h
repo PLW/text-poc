@@ -45,13 +45,6 @@ public:
         return _ftsSpec;
     }
 
-    // @@@proximity
-    Status insert(OperationContext* txn,
-                  const BSONObj& obj,
-                  const RecordId& loc,
-                  const InsertDeleteOptions& options,
-                  int64_t* numInserted);
-
 private:
     // Implemented:
     virtual void getKeys(const BSONObj& obj, BSONObjSet* keys) const;

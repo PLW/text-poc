@@ -115,8 +115,8 @@ MONGO_INITIALIZER(FTSIndexFormat)(InitializerContext* context) {
 void FTSIndexFormat::getKeysProximity(
     const FTSSpec& spec,
     const BSONObj& obj,
-    BSONObjSet* keys,
-    const RecordId& loc)
+    BSONObjSet* keys)
+    //const RecordId& loc)
 {
     TermPositionMap term_pos;
     spec.scanDocument(obj, &term_pos);
@@ -129,7 +129,7 @@ void FTSIndexFormat::getKeysProximity(
         for (PositionList::const_iterator j = posList.begin(); j != posList.end(); ++j) {
             BSONObjBuilder b(32);
             b.append("", term);
-            b.append("", loc.repr());
+            //b.append("", loc.repr());
             b.append("", *j);
             keys->insert(b.obj());
         }
@@ -141,6 +141,11 @@ void FTSIndexFormat::getKeys(
     const BSONObj& obj,
     BSONObjSet* keys)
 {
+    if (spec.proximityIndex()) {
+        getKeysProximity(spec, obj, keys);
+        return;
+    }
+
     int extraSize = 0;
     vector<BSONElement> extrasBefore;
     vector<BSONElement> extrasAfter;
@@ -203,86 +208,6 @@ void FTSIndexFormat::getKeys(
         keyBSONSize += res.objsize();
 
         uassert(16733,
-                mongoutils::str::stream()
-                    << "trying to index text where term list is too big, max is "
-                    << MaxKeyBSONSizeMB << "mb " << obj["_id"],
-                keyBSONSize <= (MaxKeyBSONSizeMB * 1024 * 1024));
-    }
-}
-
-void FTSIndexFormat::getKeys2(
-    const FTSSpec& spec,
-    const BSONObj& obj,
-    BSONObjSet* keys,
-    const RecordId& loc)
-{
-    if (spec.proximityIndex()) {
-        getKeysProximity(spec, obj, keys, loc);
-        return;
-    }
-
-    int extraSize = 0;
-    vector<BSONElement> extrasBefore;
-    vector<BSONElement> extrasAfter;
-
-    // compute the non FTS key elements
-    for (unsigned i = 0; i < spec.numExtraBefore(); i++) {
-        BSONElement e = obj.getFieldDotted(spec.extraBefore(i));
-        if (e.eoo())
-            e = nullElt;
-        uassert(-1, "cannot have a multi-key as a prefix to a text index", e.type() != Array);
-        extrasBefore.push_back(e);
-        extraSize += e.size();
-    }
-    for (unsigned i = 0; i < spec.numExtraAfter(); i++) {
-        BSONElement e = obj.getFieldDotted(spec.extraAfter(i));
-        if (e.eoo())
-            e = nullElt;
-        extrasAfter.push_back(e);
-        extraSize += e.size();
-    }
-
-
-    TermFrequencyMap term_freqs;
-    spec.scoreDocument(obj, &term_freqs);
-
-    // create index keys from raw scores
-    // only 1 per string
-
-    uassert(-1,
-            mongoutils::str::stream() << "too many unique keys for a single document to"
-                                      << " have a text index, max is " << term_freqs.size()
-                                      << obj["_id"],
-            term_freqs.size() <= 400000);
-
-    long long keyBSONSize = 0;
-    const int MaxKeyBSONSizeMB = 4;
-
-    for (TermFrequencyMap::const_iterator i = term_freqs.begin(); i != term_freqs.end(); ++i) {
-        const string& term = i->first;
-        double weight = i->second;
-
-        // guess the total size of the btree entry based on the size of the weight, term tuple
-        int guess = 5 /* bson overhead */ + 10 /* weight */ + 8 /* term overhead */ +
-            /* term size (could be truncated/hashed) */
-            guessTermSize(term, spec.getTextIndexVersion()) + extraSize;
-
-        BSONObjBuilder b(guess);  // builds a BSON object with guess length.
-        for (unsigned k = 0; k < extrasBefore.size(); k++) {
-            b.appendAs(extrasBefore[k], "");
-        }
-        _appendIndexKey(b, weight, term, spec.getTextIndexVersion());
-        for (unsigned k = 0; k < extrasAfter.size(); k++) {
-            b.appendAs(extrasAfter[k], "");
-        }
-        BSONObj res = b.obj();
-
-        verify(guess >= res.objsize());
-
-        keys->insert(res);
-        keyBSONSize += res.objsize();
-
-        uassert(-1,
                 mongoutils::str::stream()
                     << "trying to index text where term list is too big, max is "
                     << MaxKeyBSONSizeMB << "mb " << obj["_id"],

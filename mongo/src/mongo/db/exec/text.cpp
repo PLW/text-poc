@@ -64,7 +64,7 @@ TextStage::TextStage(OperationContext* txn,
 
     // @@@proximity
     if (params.spec.proximityIndex())
-        _children.emplace_back(buildTextProximityTree(txn, ws, filter, params.query.proximityWindow()));
+        _children.emplace_back(buildTextProximityTree(txn, ws, filter, params.query.getProximityWindow()));
     else
         _children.emplace_back(buildTextTree(txn, ws, filter));
 
@@ -127,6 +127,7 @@ unique_ptr<PlanStage> TextStage::buildTextTree(OperationContext* txn,
     return treeRoot;
 }
 
+// @@@proximity
 unique_ptr<PlanStage> TextStage::buildTextProximityTree(
     OperationContext* txn,
     WorkingSet* ws,

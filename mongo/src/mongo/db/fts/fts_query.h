@@ -58,6 +58,11 @@ public:
         _diacriticSensitive = diacriticSensitive;
     }
 
+    // @@@proximity
+    void setProximityWindow(uint32_t w) {
+        _proximityWindow = w;
+    }
+
     const std::string& getQuery() const {
         return _query;
     }
@@ -72,6 +77,11 @@ public:
 
     bool getDiacriticSensitive() const {
         return _diacriticSensitive;
+    }
+
+    // @@@proximity
+    uint32_t getProximityWindow() const {
+        return _proximityWindow;
     }
 
     /**
@@ -101,6 +111,9 @@ private:
     std::string _language;
     bool _caseSensitive = false;
     bool _diacriticSensitive = false;
+
+    // @@@proximity
+    uint32_t _proximityWindow = 0;
 };
 
 }  // namespace fts

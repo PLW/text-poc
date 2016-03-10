@@ -65,15 +65,6 @@ public:
         return _termsForBounds;
     }
 
-    // @@@proximity
-    uint32_t proximityWindow() const {
-        return _proximityWindow;
-    }
-
-    void setProximityWindow(uint32_t w) {
-        _proximityWindow = w;
-    }
-
     /**
      * Returns a BSON object with the following format:
      * {
@@ -94,8 +85,6 @@ private:
     std::vector<std::string> _negatedPhrases;
     std::set<std::string> _termsForBounds;
 
-    // @@@proximity
-    uint32_t _proximityWindow;
 };
 }
 }

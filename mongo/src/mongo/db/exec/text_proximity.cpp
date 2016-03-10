@@ -31,6 +31,7 @@
 #include <map>
 #include <vector>
 #include <algorithm>
+#include <iostream>
 
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/index_scan.h"
@@ -65,7 +66,10 @@ TextProximityStage::TextProximityStage(OperationContext* txn,
       _ws(ws),
       _proximityWindow(proximityWindow),
       _filter(filter),
-      _idRetrying(WorkingSet::INVALID_ID) {}
+      _idRetrying(WorkingSet::INVALID_ID)
+{
+    std::cout << "TextProximityState::ctor" << std::endl;
+}
 
 TextProximityStage::~TextProximityStage() {}
 
@@ -241,19 +245,17 @@ void TextProximityStage::collectResults() {
     std::sort(_posv.begin(), _posv.end(), proximitySort);
 
     uint64_t recId = 0;
+    uint32_t nterms = _params.query.getTermsForBounds().size();
     std::vector<TextRecordData> recv;
+    std::vector<TextRecordData>::const_iterator it2 = _posv.begin();
 
-    std::vector<TextRecordData>::const_iterator it2;
-    for (it2 = _posv.begin(); it2 != _posv.end(); ++it2) {
-
+    do {
         if (it2->recId != recId) {
-            // we have a run of common recordId's
+        // we have a run of common recordId's.
 
-            uint32_t nterms = _params.query.getTermsForBounds().size();
-
-            // scan for all terms within _proximityWindow
             std::vector<TextRecordData>::const_iterator it3;
             for (it3 = recv.begin(); it3 != recv.end(); ++it3) {
+            // scan for all terms within _proximityWindow.
 
                 std::set<std::string> terms;
                 uint32_t width = 0;
@@ -263,20 +265,18 @@ void TextProximityStage::collectResults() {
                 for (it4 = it3; it4 != recv.end() && width < _proximityWindow; ++it4) {
                     width += (it4->pos - pos);
                     terms.insert(it4->term);
-                    if (terms.size() == nterms) {
+                    if (terms.size() == nterms && width < _proximityWindow) {
                         _resultSet.push_back(it4->wsid);
                         break;
                     }
                 }
-                
             }
             recId = it2->recId;
             recv.clear();
-        } else {
-            recv.push_back(*it2);
         }
+        recv.push_back(*it2);
 
-    }
+    } while (it2++ != _posv.end());
 }
 
 PlanStage::StageState TextProximityStage::returnResults(WorkingSetID* out) {
@@ -369,6 +369,7 @@ PlanStage::StageState TextProximityStage::addTerm(WorkingSetID wsid, WorkingSetI
     invariant(wsm->getState() == WorkingSetMember::RID_AND_IDX);
     invariant(1 == wsm->keyData.size());
     const IndexKeyDatum newKeyData = wsm->keyData.back();  // copy to keep it around.
+    uint64_t loc = wsm->recordId.repr();
     TextRecordData* textRecordData = &_posMap[wsm->recordId];
 
     if (textRecordData->rejected) {
@@ -455,19 +456,19 @@ PlanStage::StageState TextProximityStage::addTerm(WorkingSetID wsid, WorkingSetI
     BSONElement termElement = keyIt.next();
     std::string term = termElement.String();
 
-    BSONElement recIdElement = keyIt.next();
-    uint64_t recId = (uint64_t)recIdElement.Long();
+    //BSONElement recIdElement = keyIt.next();
+    //uint64_t recId = (uint64_t)recIdElement.Long();
 
     BSONElement posElement = keyIt.next();
     uint32_t pos = (uint32_t)posElement.Int();
 
     // Aggregate {term,recordId,pos}
     textRecordData->term = term;
-    textRecordData->recId = recId;
+    textRecordData->recId = loc; //recId;
     textRecordData->pos = pos;
 
     _posv.push_back(*textRecordData);
-    std::cout << "textRecordData(" << term << ", " << recId << ", " << pos << ")" <<std::endl;
+    std::cout << "textRecordData(" << term << ", " << loc << ", " << pos << ")" <<std::endl;
 
     return NEED_TIME;
 }

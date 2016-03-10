@@ -48,7 +48,9 @@ void TextMatchExpressionBase::debugString(StringBuilder& debug, int level) const
     _debugAddSpace(debug, level);
     debug << "TEXT : query=" << ftsQuery.getQuery() << ", language=" << ftsQuery.getLanguage()
           << ", caseSensitive=" << ftsQuery.getCaseSensitive()
-          << ", diacriticSensitive=" << ftsQuery.getDiacriticSensitive() << ", tag=";
+          << ", diacriticSensitive=" << ftsQuery.getDiacriticSensitive()
+          << ", proximityWindow=" << ftsQuery.getProximityWindow()
+          << ", tag=";
     MatchExpression::TagData* td = getTag();
     if (NULL != td) {
         td->debugString(&debug);

@@ -46,17 +46,14 @@ public:
         std::string language;
         bool caseSensitive;
         bool diacriticSensitive;
-
-        // @@@proximity
-        int proximityWindow;
+        int proximityWindow; // @@@proximity
         int reorder;
     };
 
     static const bool kCaseSensitiveDefault;
     static const bool kDiacriticSensitiveDefault;
 
-    // @@@proximity
-    static const int kProximityWindowDefault;
+    static const int kProximityWindowDefault; // @@@proximity
     static const int kReorderDefault;
 
     TextMatchExpressionBase();

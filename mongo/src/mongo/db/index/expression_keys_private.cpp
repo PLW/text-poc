@@ -315,14 +315,6 @@ void ExpressionKeysPrivate::getFTSKeys(const BSONObj& obj,
     fts::FTSIndexFormat::getKeys(ftsSpec, obj, keys);
 }
 
-// @@@proximity
-void ExpressionKeysPrivate::getFTSKeys2(const BSONObj& obj,
-                                       const fts::FTSSpec& ftsSpec,
-                                       BSONObjSet* keys,
-                                       const RecordId& loc) {
-    fts::FTSIndexFormat::getKeys2(ftsSpec, obj, keys, loc);
-}
-
 // static
 void ExpressionKeysPrivate::getHashKeys(const BSONObj& obj,
                                         const string& hashedField,

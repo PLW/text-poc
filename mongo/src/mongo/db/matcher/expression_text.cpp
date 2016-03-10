@@ -44,10 +44,12 @@ namespace mongo {
 Status TextMatchExpression::init(OperationContext* txn,
                                  const NamespaceString& nss,
                                  TextParams params) {
+
     _ftsQuery.setQuery(std::move(params.query));
     _ftsQuery.setLanguage(std::move(params.language));
     _ftsQuery.setCaseSensitive(params.caseSensitive);
     _ftsQuery.setDiacriticSensitive(params.diacriticSensitive);
+    _ftsQuery.setProximityWindow(params.proximityWindow);   // @@@proximity
 
     fts::TextIndexVersion version;
     {

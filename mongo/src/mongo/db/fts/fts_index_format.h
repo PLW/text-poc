@@ -49,18 +49,20 @@ public:
         const BSONObj& document,
         BSONObjSet* keys);
 
+/*
     static void getKeys2(
         const FTSSpec& spec,
         const BSONObj& document,
         BSONObjSet* keys,
         const RecordId& loc);
+*/
 
     // @@@proximity
     static void getKeysProximity(
         const FTSSpec& spec,
         const BSONObj& obj,
-        BSONObjSet* keys,
-        const RecordId& loc);
+        BSONObjSet* keys);
+        //const RecordId& loc);
 
     /**
      * Helper method to get return entry from the FTSIndex as a BSONObj
