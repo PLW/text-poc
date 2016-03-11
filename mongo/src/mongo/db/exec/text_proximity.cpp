@@ -246,27 +246,27 @@ void TextProximityStage::collectResults() {
 
     uint64_t recId = 0;
     uint32_t nterms = _params.query.getTermsForBounds().size();
-    std::vector<TextRecordData> recv;
+    std::vector<const TextRecordData*> recv;
     std::vector<TextRecordData>::const_iterator it2 = _posv.begin();
 
     do {
         if (it2->recId != recId) {
         // we have a run of common recordId's.
 
-            std::vector<TextRecordData>::const_iterator it3;
+            std::vector<const TextRecordData*>::const_iterator it3;
             for (it3 = recv.begin(); it3 != recv.end(); ++it3) {
             // scan for all terms within _proximityWindow.
 
                 std::set<std::string> terms;
                 uint32_t width = 0;
-                uint32_t pos = it3->pos;
+                uint32_t pos = (*it3)->pos;
 
-                std::vector<TextRecordData>::const_iterator it4;
+                std::vector<const TextRecordData*>::const_iterator it4;
                 for (it4 = it3; it4 != recv.end() && width < _proximityWindow; ++it4) {
-                    width += (it4->pos - pos);
-                    terms.insert(it4->term);
+                    width += ((*it4)->pos - pos);
+                    terms.insert((*it4)->term);
                     if (terms.size() == nterms && width < _proximityWindow) {
-                        _resultSet.push_back(it4->wsid);
+                        _resultSet.push_back((*it4)->wsid);
                         break;
                     }
                 }
@@ -274,7 +274,7 @@ void TextProximityStage::collectResults() {
             recId = it2->recId;
             recv.clear();
         }
-        recv.push_back(*it2);
+        recv.push_back(&(*it2));
 
     } while (it2++ != _posv.end());
 }
