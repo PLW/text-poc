@@ -102,12 +102,13 @@ ExtensionsCallback::extractTextMatchExpressionParams(BSONElement text) {
         expectedFieldCount++;
     }
 
+    // @@@proximity
     Status reorderStatus = bsonExtractIntegerField(queryObj, "$reorder", &n);
-    params.reorder = n;
+    params.reorderBound = n;
     if (reorderStatus == ErrorCodes::TypeMismatch) {
         return reorderStatus;
     } else if (reorderStatus == ErrorCodes::NoSuchKey) {
-        params.reorder = TextMatchExpressionBase::kReorderDefault;
+        params.reorderBound = TextMatchExpressionBase::kReorderDefault;
     } else {
         invariantOK(reorderStatus);
         expectedFieldCount++;

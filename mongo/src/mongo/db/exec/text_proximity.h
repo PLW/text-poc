@@ -77,7 +77,8 @@ public:
                        const TextStageParams& params,
                        WorkingSet* ws,
                        const MatchExpression* filter,
-                       uint32_t proximityWindow);
+                       uint32_t proximityWindow,
+                       int reorderBound);
 
     ~TextProximityStage();
 
@@ -145,6 +146,7 @@ private:
     State _internalState = State::kInit;
     size_t _currentChild = 0;
     uint32_t _proximityWindow;
+    int _reorderBound;
 
     typedef unordered_map<RecordId, TextRecordData, RecordId::Hasher> PositionMap;
     PositionMap _posMap;

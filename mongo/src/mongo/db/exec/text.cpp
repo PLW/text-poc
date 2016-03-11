@@ -64,7 +64,9 @@ TextStage::TextStage(OperationContext* txn,
 
     // @@@proximity
     if (params.spec.proximityIndex())
-        _children.emplace_back(buildTextProximityTree(txn, ws, filter, params.query.getProximityWindow()));
+        _children.emplace_back(buildTextProximityTree( txn, ws, filter,
+                                                        params.query.getProximityWindow(),
+                                                        params.query.getReorderBound() ));
     else
         _children.emplace_back(buildTextTree(txn, ws, filter));
 
@@ -132,10 +134,11 @@ unique_ptr<PlanStage> TextStage::buildTextProximityTree(
     OperationContext* txn,
     WorkingSet* ws,
     const MatchExpression* filter,
-    uint32_t proximityWindow) const
+    uint32_t proximityWindow,
+    int reorderBound) const
 {
     auto proximityStage =
-        make_unique<TextProximityStage>(txn, _params, ws, filter, proximityWindow);
+        make_unique<TextProximityStage>(txn, _params, ws, filter, proximityWindow, reorderBound);
 
     // Get all the index scans for each term in our query.
     for (const auto& term : _params.query.getTermsForBounds()) {

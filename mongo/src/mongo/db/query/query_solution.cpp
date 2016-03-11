@@ -84,6 +84,7 @@ void TextNode::appendToString(mongoutils::str::stream* ss, int indent) const {
 
     // @@@proximity
     *ss << "proximityWindow= " << ftsQuery->getProximityWindow() << '\n';
+    *ss << "reorderBound= " << ftsQuery->getReorderBound() << '\n';
 
     addIndent(ss, indent + 1);
     *ss << "indexPrefix = " << indexPrefix.toString() << '\n';

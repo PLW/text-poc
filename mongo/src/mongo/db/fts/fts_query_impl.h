@@ -37,7 +37,6 @@
 #include "mongo/db/fts/fts_query.h"
 
 namespace mongo {
-
 namespace fts {
 
 class FTSTokenizer;
@@ -60,7 +59,6 @@ public:
     const std::vector<std::string>& getNegatedPhr() const {
         return _negatedPhrases;
     }
-
     const std::set<std::string>& getTermsForBounds() const {
         return _termsForBounds;
     }

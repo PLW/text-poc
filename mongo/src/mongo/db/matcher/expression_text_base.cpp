@@ -49,7 +49,8 @@ void TextMatchExpressionBase::debugString(StringBuilder& debug, int level) const
     debug << "TEXT : query=" << ftsQuery.getQuery() << ", language=" << ftsQuery.getLanguage()
           << ", caseSensitive=" << ftsQuery.getCaseSensitive()
           << ", diacriticSensitive=" << ftsQuery.getDiacriticSensitive()
-          << ", proximityWindow=" << ftsQuery.getProximityWindow()
+          << ", proximityWindow=" << ftsQuery.getProximityWindow()      // @@@proximity
+          << ", reorderbound=" << ftsQuery.getReorderBound()            // @@@proximity
           << ", tag=";
     MatchExpression::TagData* td = getTag();
     if (NULL != td) {
@@ -65,7 +66,10 @@ void TextMatchExpressionBase::toBSON(BSONObjBuilder* out) const {
     out->append("$text",
                 BSON("$search" << ftsQuery.getQuery() << "$language" << ftsQuery.getLanguage()
                                << "$caseSensitive" << ftsQuery.getCaseSensitive()
-                               << "$diacriticSensitive" << ftsQuery.getDiacriticSensitive()));
+                               << "$diacriticSensitive" << ftsQuery.getDiacriticSensitive()
+                               << "$proximity" << ftsQuery.getProximityWindow()     // @@@proximity
+                               << "$reorder" << ftsQuery.getReorderBound()          // @@@proximity
+                    ));
 }
 
 bool TextMatchExpressionBase::equivalent(const MatchExpression* other) const {

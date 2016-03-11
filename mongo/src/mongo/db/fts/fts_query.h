@@ -59,9 +59,9 @@ public:
     }
 
     // @@@proximity
-    void setProximityWindow(uint32_t w) {
-        _proximityWindow = w;
-    }
+    void setProximityWindow(uint32_t w) { _proximityWindow = w; }
+    void setReorderBound(int r) { _reorderBound = r; }
+    void setTermv(const std::vector<std::string>& tv) { _termv = tv; }
 
     const std::string& getQuery() const {
         return _query;
@@ -80,9 +80,9 @@ public:
     }
 
     // @@@proximity
-    uint32_t getProximityWindow() const {
-        return _proximityWindow;
-    }
+    uint32_t getProximityWindow() const { return _proximityWindow; }
+    int getReorderBound() const { return _reorderBound; }
+    const std::vector<std::string>& getTermv() const { return _termv; }
 
     /**
      * Returns true iff '*this' and 'other' have the same unparsed form.
@@ -114,6 +114,11 @@ private:
 
     // @@@proximity
     uint32_t _proximityWindow = 0;
+    int _reorderBound = 0;
+
+public:
+    std::vector<std::string> _termv;
+
 };
 
 }  // namespace fts

@@ -60,11 +60,13 @@ TextProximityStage::TextProximityStage(OperationContext* txn,
                                        const TextStageParams& params,
                                        WorkingSet* ws,
                                        const MatchExpression* filter,
-                                       uint32_t proximityWindow)
+                                       uint32_t proximityWindow,
+                                       int reorderBound)
     : PlanStage(kStageType, txn),
       _params(params),
       _ws(ws),
       _proximityWindow(proximityWindow),
+      _reorderBound(reorderBound),
       _filter(filter),
       _idRetrying(WorkingSet::INVALID_ID)
 {
@@ -240,41 +242,110 @@ bool TextProximityStage::proximitySort(TextRecordData& x, TextRecordData& y) {
     return false;
 }
 
-void TextProximityStage::collectResults() {
+uint64_t _hash(const std::string& s) {
+    uint64_t r = 0x01000193;
+    const unsigned char* p = (unsigned char*)s.c_str();
+    for (; *p; ++p) r = (r * 0x01000193) ^ *p;
+    return r;
+}
 
-    std::sort(_posv.begin(), _posv.end(), proximitySort);
+int _indexOf(const std::vector<uint64_t>& v, uint64_t key) {
+    for (uint32_t n = 0; n<v.size(); ++n)
+        if (v[n] == key) return n;
+    return -1;
+}
+
+bool _checkPermutation(std::vector<uint32_t>& perm, uint32_t bound) {
+    // bubblesort.
+    bool swapped = true;
+    uint32_t nswaps = 0;
+    uint32_t j = 0;
+    uint32_t n = perm.size();
+
+    while (swapped) {
+        swapped = false;
+        ++j;
+        for (uint32_t i = 0; i < n-j; ++i) {
+            if (perm[i] > perm[i+1]) {
+                std::swap(perm[i], perm[i+1]);
+                swapped = true;
+                ++nswaps;
+            }
+        }
+    }
+    return (nswaps <= bound);
+}
+
+void TextProximityStage::collectResults() {
 
     uint64_t recId = 0;
     uint32_t nterms = _params.query.getTermsForBounds().size();
-    std::vector<const TextRecordData*> recv;
+
+    std::vector<const TextRecordData*> runv;    // run of records for common RecordId.
+    std::vector<uint64_t>* termv;               // query term hashes in given order.
+    std::vector<uint32_t>* termperm;            // permutation of terms in matching window.
+
+    std::cout << "_reorderBound = " << _reorderBound << std::endl;
+
+    if (_reorderBound >= 0) {
+        // set up permutation testing.
+        termperm = new std::vector<uint32_t>(nterms);
+        termv = new std::vector<uint64_t>(nterms);
+        std::vector<std::string>::const_iterator it;
+        for (it = _params.query.getTermv().begin(); it != _params.query.getTermv().end(); ++it) {
+            std::cout << "termv->push_back(_hash(" << *it << "));" << std::endl;
+            termv->push_back(_hash(*it));
+        }
+    }
+
+    // sort the entire working set and process runs of common RecordIds
+    std::sort(_posv.begin(), _posv.end(), proximitySort);
     std::vector<TextRecordData>::const_iterator it2 = _posv.begin();
 
     do {
         if (it2->recId != recId) {
-        // we have a run of common recordId's.
+            // we have a run of common recordIds stored in runv.
+            termperm->clear();
 
             std::vector<const TextRecordData*>::const_iterator it3;
-            for (it3 = recv.begin(); it3 != recv.end(); ++it3) {
-            // scan for all terms within _proximityWindow.
+            for (it3 = runv.begin(); it3 != runv.end(); ++it3) {
+                // scan for all terms within _proximityWindow.
 
-                std::set<std::string> terms;
-                uint32_t width = 0;
-                uint32_t pos = (*it3)->pos;
+                std::set<std::string> terms;    // for counting unique matching terms.
+                uint32_t width = 0;             // current width of match window.
+                uint32_t pos = (*it3)->pos;     // current term position.
 
                 std::vector<const TextRecordData*>::const_iterator it4;
-                for (it4 = it3; it4 != recv.end() && width < _proximityWindow; ++it4) {
-                    width += ((*it4)->pos - pos);
-                    terms.insert((*it4)->term);
+                for (it4 = it3; it4 != runv.end() && width < _proximityWindow; ++it4) {
+
+                    const std::string& term = (*it4)->term;
+                    uint32_t termPos = (*it4)->pos;
+
+                    std::cout << "(term,pos) = (" << term << ", " << pos << ")" << std::endl;
+
+                    width += (termPos - pos);
+                    terms.insert(term);
+
+                    if (_reorderBound >= 0) {
+                        int i = _indexOf(*termv, _hash(term));
+                        if (-1==i) {
+                            std::cout << "Uh-oh, internal search term error!" << std:: endl;
+                            break;
+                        }
+                        termperm->push_back((uint32_t)i);
+                    }
+
                     if (terms.size() == nterms && width < _proximityWindow) {
-                        _resultSet.push_back((*it4)->wsid);
+                        if (-1 == _reorderBound || _checkPermutation(*termperm, _reorderBound))
+                            _resultSet.push_back((*it4)->wsid);
                         break;
                     }
                 }
             }
             recId = it2->recId;
-            recv.clear();
+            runv.clear();
         }
-        recv.push_back(&(*it2));
+        runv.push_back(&(*it2));
 
     } while (it2++ != _posv.end());
 }

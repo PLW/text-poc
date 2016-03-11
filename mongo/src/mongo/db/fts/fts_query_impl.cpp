@@ -72,6 +72,10 @@ Status FTSQueryImpl::parse(TextIndexVersion textIndexVersion) {
         if (t.type == QueryToken::TEXT) {
             string s = t.data.toString();
 
+            // @@@proximity
+            _termv.push_back(s);
+            std::cout << "_termv.push_back(" << s << ")" << std::endl;
+
             if (inPhrase && inNegation) {
                 // don't add term
             } else {
@@ -147,8 +151,9 @@ std::unique_ptr<FTSQuery> FTSQueryImpl::clone() const {
     clonedQuery->setDiacriticSensitive(getDiacriticSensitive());
 
     // @@@proximity
-    uint32_t w = getProximityWindow();
-    clonedQuery->setProximityWindow(w);
+    clonedQuery->setProximityWindow(getProximityWindow());
+    clonedQuery->setReorderBound(getReorderBound());
+    clonedQuery->setTermv(getTermv());
 
     clonedQuery->_positiveTerms = _positiveTerms;
     clonedQuery->_negatedTerms = _negatedTerms;

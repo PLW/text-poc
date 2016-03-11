@@ -47,7 +47,7 @@ public:
         bool caseSensitive;
         bool diacriticSensitive;
         int proximityWindow; // @@@proximity
-        int reorder;
+        int reorderBound;    // @@@proximity
     };
 
     static const bool kCaseSensitiveDefault;

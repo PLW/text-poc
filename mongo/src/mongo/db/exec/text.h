@@ -102,7 +102,8 @@ private:
     unique_ptr<PlanStage> buildTextProximityTree(OperationContext* txn,
                                                  WorkingSet* ws,
                                                  const MatchExpression* filter,
-                                                 uint32_t proximityWindow) const;
+                                                 uint32_t proximityWindow,
+                                                 int reorderBound) const;
 
     // Parameters of this text stage.
     TextStageParams _params;

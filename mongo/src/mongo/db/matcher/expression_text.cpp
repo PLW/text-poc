@@ -50,6 +50,7 @@ Status TextMatchExpression::init(OperationContext* txn,
     _ftsQuery.setCaseSensitive(params.caseSensitive);
     _ftsQuery.setDiacriticSensitive(params.diacriticSensitive);
     _ftsQuery.setProximityWindow(params.proximityWindow);   // @@@proximity
+    _ftsQuery.setReorderBound(params.reorderBound);         // @@@proximity
 
     fts::TextIndexVersion version;
     {
