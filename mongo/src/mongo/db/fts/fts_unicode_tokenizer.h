@@ -65,6 +65,7 @@ public:
     bool moveNext() override;
 
     StringData get() const override;
+    StringData getWord() const override;    // @@@proximity
 
 private:
     /**
@@ -89,6 +90,7 @@ private:
     Options _options;
 
     std::string _stem;
+    std::string _word;  // @@@proximity
 };
 
 }  // namespace fts

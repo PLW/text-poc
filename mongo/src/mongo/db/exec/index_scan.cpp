@@ -102,6 +102,10 @@ boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
         _endKey = _params.bounds.endKey;
         _endKeyInclusive = _params.bounds.endKeyInclusive;
         _indexCursor->setEndPosition(_endKey, _endKeyInclusive);
+
+        std::cout << "IndexScan::init : endKey = " << _endKey.toString(0,0) << std::endl;
+        std::cout << "IndexScan::init : startKey = " << _params.bounds.startKey.toString(0,0) << std::endl;
+
         return _indexCursor->seek(_params.bounds.startKey, /*inclusive*/ true);
     } else {
         // For single intervals, we can use an optimized scan which checks against the position
@@ -130,16 +134,20 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
     try {
         switch (_scanState) {
             case INITIALIZING:
+                std::cout << "IndexScan::doWork : INIT" << std::endl;
                 kv = initIndexScan();
                 break;
             case GETTING_NEXT:
+                std::cout << "IndexScan::doWork : NEXT" << std::endl;
                 kv = _indexCursor->next();
                 break;
             case NEED_SEEK:
+                std::cout << "IndexScan::doWork : SEEK" << std::endl;
                 ++_specificStats.seeks;
                 kv = _indexCursor->seek(_seekPoint);
                 break;
             case HIT_END:
+                std::cout << "IndexScan::doWork : END" << std::endl;
                 return PlanStage::IS_EOF;
         }
     } catch (const WriteConflictException& wce) {
@@ -148,6 +156,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
     }
 
     if (kv) {
+        std::cout << "IndexScan::doWork : (kv)" << std::endl;
         // In debug mode, check that the cursor isn't lying to us.
         if (kDebugBuild && !_endKey.isEmpty()) {
             int cmp = kv->key.woCompare(_endKey,
@@ -165,6 +174,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
     }
 
     if (kv && _checker) {
+        std::cout << "IndexScan::doWork : (kv && _checker)" << std::endl;
         switch (_checker->checkKey(kv->key, &_seekPoint)) {
             case IndexBoundsChecker::VALID:
                 break;
@@ -180,6 +190,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
     }
 
     if (!kv) {
+        std::cout << "IndexScan::doWork : (!kv)" << std::endl;
         _scanState = HIT_END;
         _commonStats.isEOF = true;
         _indexCursor.reset();
@@ -189,6 +200,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
     _scanState = GETTING_NEXT;
 
     if (_shouldDedup) {
+        std::cout << "IndexScan::doWork : (_shouldDedup)" << std::endl;
         ++_specificStats.dupsTested;
         if (!_returned.insert(kv->loc).second) {
             // We've seen this RecordId before. Skip it this time.
@@ -198,6 +210,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
     }
 
     if (_filter) {
+        std::cout << "IndexScan::doWork : (_filter)" << std::endl;
         if (!Filter::passes(kv->key, _keyPattern, _filter)) {
             return PlanStage::NEED_TIME;
         }
@@ -207,10 +220,12 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
         kv->key = kv->key.getOwned();
 
     // We found something to return, so fill out the WSM.
+    std::cout << "IndexScan::doWork : fill WSM" << std::endl;
     WorkingSetID id = _workingSet->allocate();
     WorkingSetMember* member = _workingSet->get(id);
     member->recordId = kv->loc;
     member->keyData.push_back(IndexKeyDatum(_keyPattern, kv->key, _iam));
+    std::cout << "IndexScan::doWork : IndexKey = " << kv->key.toString(0,0) << std::endl;
     _workingSet->transitionToRecordIdAndIdx(id);
 
     if (_params.addKeyMetadata) {

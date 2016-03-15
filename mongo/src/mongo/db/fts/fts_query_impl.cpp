@@ -172,7 +172,7 @@ void FTSQueryImpl::_addTerms(FTSTokenizer* tokenizer, const string& sentence, bo
     // If we are case-insensitive, we can also used this for positive, and negative terms
     // Some terms may be expanded into multiple words in some non-English languages
     while (tokenizer->moveNext()) {
-        string word = tokenizer->get().toString();
+        string word = tokenizer->getWord().toString();  // @@@proximity
 
         if (!negated) {
             _termsForBounds.insert(word);
@@ -203,8 +203,7 @@ void FTSQueryImpl::_addTerms(FTSTokenizer* tokenizer, const string& sentence, bo
 
     // If we want case-sensitivity or diacritic sensitivity, get the correct token.
     while (tokenizer->moveNext()) {
-        string word = tokenizer->get().toString();
-
+        string word = tokenizer->getWord().toString();  // @@@proximity
         activeTerms.insert(word);
     }
 }

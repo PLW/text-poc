@@ -175,6 +175,7 @@ PlanStage::StageState TextProximityStage::readFromChildren(WorkingSetID* out) {
 
     // Check to see if there were any children added in the first place.
     if (_children.size() == 0) {
+        std::cout << "readFromChildren:001" << std::endl;
         _internalState = State::kDone;
         return PlanStage::IS_EOF;
     }
@@ -186,8 +187,10 @@ PlanStage::StageState TextProximityStage::readFromChildren(WorkingSetID* out) {
     StageState childState;
 
     if (_idRetrying == WorkingSet::INVALID_ID) {
+        std::cout << "readFromChildren:002" << std::endl;
         childState = _children[_currentChild]->work(&id);
     } else {
+        std::cout << "readFromChildren:003" << std::endl;
         childState = ADVANCED;
         id = _idRetrying;
         _idRetrying = WorkingSet::INVALID_ID;
@@ -195,13 +198,19 @@ PlanStage::StageState TextProximityStage::readFromChildren(WorkingSetID* out) {
 
     switch(childState) {
     case PlanStage::ADVANCED: {
+        std::cout << "readFromChildren:004" << std::endl;
         return addTerm(id, out);
     }
     case PlanStage::IS_EOF: {
+        std::cout << "readFromChildren:005" << std::endl;
         // Done with this child.
         ++_currentChild;
 
+        std::cout << "currentChild = " << _currentChild
+                  << ", children.size = " << _children.size() << std::endl;
+
         if (_currentChild < _children.size()) {
+            std::cout << "readFromChildren:005a" << std::endl;
             // We have another child to read from.
             return PlanStage::NEED_TIME;
         }
@@ -214,20 +223,26 @@ PlanStage::StageState TextProximityStage::readFromChildren(WorkingSetID* out) {
         return PlanStage::NEED_TIME;
     }
     case PlanStage::FAILURE: {
+        std::cout << "readFromChildren:006" << std::endl;
         // If a stage fails, it may create a status WSM to indicate why it
         // failed, in which case 'id' is valid.  If ID is invalid, we
         // create our own error message.
         if (WorkingSet::INVALID_ID == id) {
+            std::cout << "readFromChildren:006a" << std::endl;
             mongoutils::str::stream ss;
             ss << "TEXT_PROXIMITY stage failed to read in results from child";
             Status status(ErrorCodes::InternalError, ss);
             *out = WorkingSetCommon::allocateStatusMember(_ws, status);
         } else {
+            std::cout << "readFromChildren:006b" << std::endl;
             *out = id;
         }
         return PlanStage::FAILURE;
     }
     default: {
+        std::cout << "readFromChildren:007 (state = "
+                    << PlanStage::stateStr(childState)
+                    << ")" << std::endl;
         // Propagate WSID from below.
         *out = id;
         return childState;
@@ -257,6 +272,8 @@ int _indexOf(const std::vector<uint64_t>& v, uint64_t key) {
 
 bool _checkPermutation(std::vector<uint32_t>& perm, uint32_t bound) {
     // bubblesort.
+    std::cout << "checkPermutation(bound = " << bound << ")" << std::endl;
+
     bool swapped = true;
     uint32_t nswaps = 0;
     uint32_t j = 0;
@@ -273,6 +290,7 @@ bool _checkPermutation(std::vector<uint32_t>& perm, uint32_t bound) {
             }
         }
     }
+    std::cout << "checkPermutation : nswaps = " << nswaps << std::endl;
     return (nswaps <= bound);
 }
 
@@ -302,10 +320,11 @@ void TextProximityStage::collectResults() {
     std::sort(_posv.begin(), _posv.end(), proximitySort);
     std::vector<TextRecordData>::const_iterator it2 = _posv.begin();
 
-    do {
+    for (; it2 != _posv.end(); ++it2) {
         if (it2->recId != recId) {
             // we have a run of common recordIds stored in runv.
             termperm->clear();
+            std::cout << "runv.size() = " << runv.size() << std::endl;
 
             std::vector<const TextRecordData*>::const_iterator it3;
             for (it3 = runv.begin(); it3 != runv.end(); ++it3) {
@@ -314,22 +333,27 @@ void TextProximityStage::collectResults() {
                 std::set<std::string> terms;    // for counting unique matching terms.
                 uint32_t width = 0;             // current width of match window.
                 uint32_t pos = (*it3)->pos;     // current term position.
+                uint32_t depth = 0;
 
                 std::vector<const TextRecordData*>::const_iterator it4;
-                for (it4 = it3; it4 != runv.end() && width < _proximityWindow; ++it4) {
+                for (it4 = it3; it4 != runv.end() && width < _proximityWindow; ++it4, ++depth) {
 
                     const std::string& term = (*it4)->term;
                     uint32_t termPos = (*it4)->pos;
 
-                    std::cout << "(term,pos) = (" << term << ", " << pos << ")" << std::endl;
+                    for (uint32_t z = 0; z<depth; ++z) std::cout << ' ';
+                    std::cout << "(id, term, pos) = (" << recId << ", "
+                              << term << ", " << termPos << ")" << std::endl;
 
                     width += (termPos - pos);
+                    pos = termPos;
                     terms.insert(term);
 
                     if (_reorderBound >= 0) {
                         int i = _indexOf(*termv, _hash(term));
                         if (-1==i) {
-                            std::cout << "Uh-oh, internal search term error!" << std:: endl;
+                            std::cout << "Uh-oh, internal inconsistentcy: index term hash"
+                                         " does not match any query term hash!" << std:: endl;
                             break;
                         }
                         termperm->push_back((uint32_t)i);
@@ -346,8 +370,7 @@ void TextProximityStage::collectResults() {
             runv.clear();
         }
         runv.push_back(&(*it2));
-
-    } while (it2++ != _posv.end());
+    }
 }
 
 PlanStage::StageState TextProximityStage::returnResults(WorkingSetID* out) {
@@ -439,7 +462,7 @@ PlanStage::StageState TextProximityStage::addTerm(WorkingSetID wsid, WorkingSetI
     WorkingSetMember* wsm = _ws->get(wsid);
     invariant(wsm->getState() == WorkingSetMember::RID_AND_IDX);
     invariant(1 == wsm->keyData.size());
-    const IndexKeyDatum newKeyData = wsm->keyData.back();  // copy to keep it around.
+    IndexKeyDatum newKeyData = wsm->keyData.back();  // copy to keep it around.
     uint64_t loc = wsm->recordId.repr();
     TextRecordData* textRecordData = &_posMap[wsm->recordId];
 
@@ -447,14 +470,17 @@ PlanStage::StageState TextProximityStage::addTerm(WorkingSetID wsid, WorkingSetI
         // We rejected this document for not matching the filter.
         invariant(WorkingSet::INVALID_ID == textRecordData->wsid);
         _ws->free(wsid);
+        std::cout << "addTerm:001" << std::endl;
         return NEED_TIME;
     }
 
     if (WorkingSet::INVALID_ID == textRecordData->wsid) {
+        std::cout << "addTerm:002" << std::endl;
         // We haven't seen this RecordId before.
         bool shouldKeep = true;
 
         if (_filter) {
+            std::cout << "addTerm:003" << std::endl;
             // We have not seen this document before and need to apply a filter.
             bool wasDeleted = false;
             try {
@@ -471,6 +497,7 @@ PlanStage::StageState TextProximityStage::addTerm(WorkingSetID wsid, WorkingSetI
                 wsm->makeObjOwnedIfNeeded();
                 _idRetrying = wsid;
                 *out = WorkingSet::INVALID_ID;
+                std::cout << "addTerm:004" << std::endl;
                 return NEED_YIELD;
             } catch (const TextMatchableDocument::DocumentDeletedException&) {
                 // We attempted to fetch the document but decided it should be excluded from the
@@ -485,6 +512,7 @@ PlanStage::StageState TextProximityStage::addTerm(WorkingSetID wsid, WorkingSetI
         }
 
         if (shouldKeep && !wsm->hasObj()) {
+            std::cout << "addTerm:005" << std::endl;
             // Our parent expects RID_AND_OBJ members: fetch the document if we haven't already.
             try {
                 shouldKeep = WorkingSetCommon::fetch(getOpCtx(), _ws, wsid, _recordCursor);
@@ -493,6 +521,7 @@ PlanStage::StageState TextProximityStage::addTerm(WorkingSetID wsid, WorkingSetI
                 wsm->makeObjOwnedIfNeeded();
                 _idRetrying = wsid;
                 *out = WorkingSet::INVALID_ID;
+                std::cout << "addTerm:006" << std::endl;
                 return NEED_YIELD;
             }
         }
@@ -500,6 +529,7 @@ PlanStage::StageState TextProximityStage::addTerm(WorkingSetID wsid, WorkingSetI
         if (!shouldKeep) {
             _ws->free(wsid);
             textRecordData->rejected = true;
+            std::cout << "addTerm:007" << std::endl;
             return NEED_TIME;
         }
 
@@ -518,7 +548,7 @@ PlanStage::StageState TextProximityStage::addTerm(WorkingSetID wsid, WorkingSetI
         wsm = _ws->get(textRecordData->wsid);
     }
 
-    // compound key {prefix,term,recordId,pos}.
+    // compound key {prefix,term,pos}.
     BSONObjIterator keyIt(newKeyData.keyData);
     for (unsigned i = 0; i < _params.spec.numExtraBefore(); i++) {
         keyIt.next();
@@ -527,15 +557,12 @@ PlanStage::StageState TextProximityStage::addTerm(WorkingSetID wsid, WorkingSetI
     BSONElement termElement = keyIt.next();
     std::string term = termElement.String();
 
-    //BSONElement recIdElement = keyIt.next();
-    //uint64_t recId = (uint64_t)recIdElement.Long();
-
     BSONElement posElement = keyIt.next();
     uint32_t pos = (uint32_t)posElement.Int();
 
     // Aggregate {term,recordId,pos}
     textRecordData->term = term;
-    textRecordData->recId = loc; //recId;
+    textRecordData->recId = loc;
     textRecordData->pos = pos;
 
     _posv.push_back(*textRecordData);

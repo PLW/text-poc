@@ -83,12 +83,17 @@ bool BasicFTSTokenizer::moveNext() {
         }
 
         _stem = _stemmer.stem(word);
+        _word = word;       // @@@proximity
         return true;
     }
 }
 
 StringData BasicFTSTokenizer::get() const {
     return _stem;
+}
+
+StringData BasicFTSTokenizer::getWord() const {
+    return _word;
 }
 
 }  // namespace fts

@@ -77,10 +77,9 @@ public:
                                TextIndexVersion textIndexVersion);
 
     // @@@proximity
-    static BSONObj getIndexProximityKey(const std::string& term,
+    static BSONObj getProximityIndexKey(const std::string& term,
                                         uint32_t pos,
-                                        const BSONObj& indexPrefix,
-                                        TextIndexVersion textIndexVersion);
+                                        const BSONObj& indexPrefix);
 
 private:
     /**

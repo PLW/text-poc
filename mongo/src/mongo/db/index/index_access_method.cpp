@@ -108,9 +108,12 @@ Status IndexAccessMethod::insert(OperationContext* txn,
     // Delegate to the subclass.
     getKeys(obj, &keys);
 
+    std::cout << "-----------------------------" << std::endl;
     Status ret = Status::OK();
     for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
         Status status = _newInterface->insert(txn, *i, loc, options.dupsAllowed);
+
+        std::cout << "index insert(" << loc.repr() << ", " << i->toString(0,0) << ")" << std::endl;
 
         // Everything's OK, carry on.
         if (status.isOK()) {

@@ -67,6 +67,7 @@ public:
     bool moveNext() override;
 
     StringData get() const override;
+    StringData getWord() const override;
 
 private:
     const FTSLanguage* const _language;
@@ -78,6 +79,7 @@ private:
     Options _options;
 
     std::string _stem;
+    std::string _word;
 };
 
 }  // namespace fts

@@ -116,7 +116,6 @@ void FTSIndexFormat::getKeysProximity(
     const FTSSpec& spec,
     const BSONObj& obj,
     BSONObjSet* keys)
-    //const RecordId& loc)
 {
     TermPositionMap term_pos;
     spec.scanDocument(obj, &term_pos);
@@ -127,9 +126,8 @@ void FTSIndexFormat::getKeysProximity(
         const PositionList& posList = i->second;
 
         for (PositionList::const_iterator j = posList.begin(); j != posList.end(); ++j) {
-            BSONObjBuilder b(32);
+            BSONObjBuilder b(64);
             b.append("", term);
-            //b.append("", loc.repr());
             b.append("", *j);
             keys->insert(b.obj());
         }
@@ -213,6 +211,18 @@ void FTSIndexFormat::getKeys(
                     << MaxKeyBSONSizeMB << "mb " << obj["_id"],
                 keyBSONSize <= (MaxKeyBSONSizeMB * 1024 * 1024));
     }
+}
+
+BSONObj FTSIndexFormat::getProximityIndexKey(const string& term,
+                                             uint32_t pos,
+                                             const BSONObj& indexPrefix) {
+    BSONObjBuilder b;
+    BSONObjIterator i(indexPrefix);
+    while (i.more())
+        b.appendAs(i.next(), "");
+    b.append("", term);
+    b.append("", pos);
+    return b.obj();
 }
 
 BSONObj FTSIndexFormat::getIndexKey(double weight,

@@ -99,7 +99,8 @@ bool UnicodeFTSTokenizer::moveNext() {
         }
 
         // The stemmer is diacritic sensitive, so stem the word before removing diacritics.
-        _stem = _stemmer.stem(_wordBuf.toString());
+        _word = _wordBuf.toString();        // @@@proximity
+        _stem = _stemmer.stem(_word);       // @@@proximity
 
         if (!(_options & kGenerateDiacriticSensitiveTokens)) {
             _tokenBuf.resetData(_stem);
@@ -113,6 +114,10 @@ bool UnicodeFTSTokenizer::moveNext() {
 
 StringData UnicodeFTSTokenizer::get() const {
     return _stem;
+}
+
+StringData UnicodeFTSTokenizer::getWord() const {
+    return _word;
 }
 
 void UnicodeFTSTokenizer::_skipDelimiters() {

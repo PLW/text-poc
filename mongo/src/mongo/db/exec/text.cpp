@@ -142,16 +142,23 @@ unique_ptr<PlanStage> TextStage::buildTextProximityTree(
 
     // Get all the index scans for each term in our query.
     for (const auto& term : _params.query.getTermsForBounds()) {
+
+        std::cout << "buildTextProximityTree : term = " << term << std::endl;
+
         IndexScanParams ixparams;
 
-        ixparams.bounds.startKey = FTSIndexFormat::getIndexKey(
-            MAX_WEIGHT, term, _params.indexPrefix, _params.spec.getTextIndexVersion());
-        ixparams.bounds.endKey = FTSIndexFormat::getIndexKey(
-            0, term, _params.indexPrefix, _params.spec.getTextIndexVersion());
-        ixparams.bounds.endKeyInclusive = true;
+        ixparams.bounds.startKey = FTSIndexFormat::getProximityIndexKey(
+            term, 0, _params.indexPrefix);
+        std::cout << "startKey = (" << term << ", 0)" << std::endl;
+
+        ixparams.bounds.endKey = FTSIndexFormat::getProximityIndexKey(
+            term, (1<<24), _params.indexPrefix);
+        std::cout << "endKey = (" << term << ", " << (1<<24) << ")" << std::endl;
+
+        ixparams.bounds.endKeyInclusive = false;
         ixparams.bounds.isSimpleRange = true;
         ixparams.descriptor = _params.index;
-        ixparams.direction = -1;
+        ixparams.direction = 1;
 
         proximityStage->addChild(make_unique<IndexScan>(txn, ixparams, ws, nullptr));
     }

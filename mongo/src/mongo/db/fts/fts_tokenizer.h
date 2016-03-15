@@ -93,6 +93,7 @@ public:
      * Returned StringData is valid until next call to moveNext().
      */
     virtual StringData get() const = 0;
+    virtual StringData getWord() const = 0;     // @@@proximity
 };
 
 }  // namespace fts
