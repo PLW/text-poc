@@ -182,7 +182,7 @@ uint32_t FTSSpec::_scanString(FTSTokenizer* tokenizer,
     tokenizer->reset(raw.rawData(), FTSTokenizer::kNone);
 
     while (tokenizer->moveNext()) {
-        string term = tokenizer->getWord().toString();
+        string term = tokenizer->get().toString();
         PositionList& p = (*termPosMap)[term];
         p.push_back(pos++);
         ++termCount;

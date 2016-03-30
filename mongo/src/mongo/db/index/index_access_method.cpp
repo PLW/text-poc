@@ -55,6 +55,8 @@ using std::vector;
 
 MONGO_EXPORT_SERVER_PARAMETER(failIndexKeyTooLong, bool, true);
 
+const bool iam_debug = false;
+
 //
 // Comparison for external sorter interface
 //
@@ -108,12 +110,15 @@ Status IndexAccessMethod::insert(OperationContext* txn,
     // Delegate to the subclass.
     getKeys(obj, &keys);
 
-    std::cout << "-----------------------------" << std::endl;
+    if (iam_debug)  // @@@proximity
+        std::cout << "-----------------------------" << std::endl;
+
     Status ret = Status::OK();
     for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
         Status status = _newInterface->insert(txn, *i, loc, options.dupsAllowed);
 
-        std::cout << "index insert(" << loc.repr() << ", " << i->toString(0,0) << ")" << std::endl;
+        if (iam_debug)  // @@@proximity
+            std::cout << "index insert(" << loc.repr() << ", " << i->toString(0,0) << ")" << std::endl;
 
         // Everything's OK, carry on.
         if (status.isOK()) {

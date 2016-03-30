@@ -56,6 +56,8 @@ using fts::MAX_WEIGHT;
 
 const char* TextStage::kStageType = "TEXT";
 
+const bool t_debug = false;
+
 TextStage::TextStage(OperationContext* txn,
                      const TextStageParams& params,
                      WorkingSet* ws,
@@ -143,17 +145,22 @@ unique_ptr<PlanStage> TextStage::buildTextProximityTree(
     // Get all the index scans for each term in our query.
     for (const auto& term : _params.query.getTermsForBounds()) {
 
-        std::cout << "buildTextProximityTree : term = " << term << std::endl;
+        if (t_debug)
+            std::cout << "buildTextProximityTree : term = " << term << std::endl;
 
         IndexScanParams ixparams;
 
         ixparams.bounds.startKey = FTSIndexFormat::getProximityIndexKey(
             term, 0, _params.indexPrefix);
-        std::cout << "startKey = (" << term << ", 0)" << std::endl;
+
+        if (t_debug)
+            std::cout << "startKey = (" << term << ", 0)" << std::endl;
 
         ixparams.bounds.endKey = FTSIndexFormat::getProximityIndexKey(
             term, (1<<24), _params.indexPrefix);
-        std::cout << "endKey = (" << term << ", " << (1<<24) << ")" << std::endl;
+
+        if (t_debug)
+            std::cout << "endKey = (" << term << ", " << (1<<24) << ")" << std::endl;
 
         ixparams.bounds.endKeyInclusive = false;
         ixparams.bounds.isSimpleRange = true;

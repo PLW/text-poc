@@ -34,6 +34,7 @@
 
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/fts/fts_query_parser.h"
+#include "mongo/db/fts/stemmer.h"       // @@@proximity
 #include "mongo/db/fts/fts_tokenizer.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stringutils.h"
@@ -50,6 +51,8 @@ using std::string;
 using std::stringstream;
 using std::vector;
 
+const bool fqi_debug = false;   // @@@proximity
+
 Status FTSQueryImpl::parse(TextIndexVersion textIndexVersion) {
     StatusWithFTSLanguage ftsLanguage = FTSLanguage::make(getLanguage(), textIndexVersion);
     if (!ftsLanguage.getStatus().isOK()) {
@@ -64,6 +67,7 @@ Status FTSQueryImpl::parse(TextIndexVersion textIndexVersion) {
     bool inPhrase = false;
 
     unsigned quoteOffset = 0;
+    const Stemmer stemmer(ftsLanguage.getValue());     // @@@proximity
 
     FTSQueryParser i(getQuery());
     while (i.more()) {
@@ -73,8 +77,9 @@ Status FTSQueryImpl::parse(TextIndexVersion textIndexVersion) {
             string s = t.data.toString();
 
             // @@@proximity
-            _termv.push_back(s);
-            std::cout << "_termv.push_back(" << s << ")" << std::endl;
+            _termv.push_back(stemmer.stem(s));
+            if (fqi_debug)
+                std::cout << "_termv.push_back(" << stemmer.stem(s) << ")" << std::endl;
 
             if (inPhrase && inNegation) {
                 // don't add term
@@ -172,7 +177,7 @@ void FTSQueryImpl::_addTerms(FTSTokenizer* tokenizer, const string& sentence, bo
     // If we are case-insensitive, we can also used this for positive, and negative terms
     // Some terms may be expanded into multiple words in some non-English languages
     while (tokenizer->moveNext()) {
-        string word = tokenizer->getWord().toString();  // @@@proximity
+        string word = tokenizer->get().toString();  // @@@proximity (was 'getWord')
 
         if (!negated) {
             _termsForBounds.insert(word);
@@ -203,7 +208,7 @@ void FTSQueryImpl::_addTerms(FTSTokenizer* tokenizer, const string& sentence, bo
 
     // If we want case-sensitivity or diacritic sensitivity, get the correct token.
     while (tokenizer->moveNext()) {
-        string word = tokenizer->getWord().toString();  // @@@proximity
+        string word = tokenizer->get().toString();  // @@@proximity (was 'getWord')
         activeTerms.insert(word);
     }
 }
