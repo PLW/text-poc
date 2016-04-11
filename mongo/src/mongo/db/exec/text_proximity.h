@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+// @@@prox : text proximity exec stage interface
+
 #pragma once
 
 #include <memory>

@@ -77,6 +77,8 @@ const size_t termKeyLengthV3 = termKeyPrefixLengthV3 + termKeySuffixLengthV3;
 
 const size_t maxKeysPerDoc = 400000;
 
+const bool ftsif_debug = false;  // @@@prox : proximity key gen debug
+
 /**
  * Returns size of buffer required to store term in index key.
  * In version 1, terms are stored verbatim in key.
@@ -111,7 +113,7 @@ MONGO_INITIALIZER(FTSIndexFormat)(InitializerContext* context) {
     return Status::OK();
 }
 
-// @@@proximity
+// @@@prox : generate (term,pos) keys
 void FTSIndexFormat::getKeysProximity(
     const FTSSpec& spec,
     const BSONObj& obj,
@@ -130,6 +132,35 @@ void FTSIndexFormat::getKeysProximity(
             b.append("", term);
             b.append("", *j);
             keys->insert(b.obj());
+        }
+    }
+}
+
+// @@@prox : generate (term,loc,pos) keys
+void FTSIndexFormat::getKeysProximity2(
+    const FTSSpec& spec,
+    const BSONObj& obj,
+    const RecordId& loc,
+    BSONObjSet* keys)
+{
+    TermPositionMap term_pos;
+    spec.scanDocument(obj, &term_pos);
+
+    for (TermPositionMap::const_iterator i = term_pos.begin(); i != term_pos.end(); ++i) {
+
+        const string& term = i->first;
+        const PositionList& posList = i->second;
+
+        for (PositionList::const_iterator j = posList.begin(); j != posList.end(); ++j) {
+            BSONObjBuilder b(64);
+            b.append("", term);
+            b.append("", loc.repr());
+            b.append("", *j);
+            keys->insert(b.obj());
+            if (ftsif_debug)
+                std::cout << "keys.insert(" << term
+                                     << "," << loc.repr()
+                                     << "," << (*j) << ")" << std::endl;
         }
     }
 }
@@ -213,6 +244,86 @@ void FTSIndexFormat::getKeys(
     }
 }
 
+void FTSIndexFormat::getKeys2(
+    const FTSSpec& spec,
+    const BSONObj& obj,
+    const RecordId& loc,
+    BSONObjSet* keys)
+{
+    if (spec.proximityIndex()) {
+        getKeysProximity2(spec, obj, loc, keys);
+        return;
+    }
+
+    int extraSize = 0;
+    vector<BSONElement> extrasBefore;
+    vector<BSONElement> extrasAfter;
+
+    // compute the non FTS key elements
+    for (unsigned i = 0; i < spec.numExtraBefore(); i++) {
+        BSONElement e = obj.getFieldDotted(spec.extraBefore(i));
+        if (e.eoo())
+            e = nullElt;
+        uassert(-1, "cannot have a multi-key as a prefix to a text index", e.type() != Array);
+        extrasBefore.push_back(e);
+        extraSize += e.size();
+    }
+    for (unsigned i = 0; i < spec.numExtraAfter(); i++) {
+        BSONElement e = obj.getFieldDotted(spec.extraAfter(i));
+        if (e.eoo())
+            e = nullElt;
+        extrasAfter.push_back(e);
+        extraSize += e.size();
+    }
+
+
+    TermFrequencyMap term_freqs;
+    spec.scoreDocument(obj, &term_freqs);
+
+    // create index keys from raw scores
+    // only 1 per string
+
+    uassert(-1,
+            mongoutils::str::stream() << "too many unique keys for a single document to"
+                                      << " have a text index, max is " << term_freqs.size()
+                                      << obj["_id"],
+            term_freqs.size() <= 400000);
+
+    long long keyBSONSize = 0;
+    const int MaxKeyBSONSizeMB = 4;
+
+    for (TermFrequencyMap::const_iterator i = term_freqs.begin(); i != term_freqs.end(); ++i) {
+        const string& term = i->first;
+        double weight = i->second;
+
+        // guess the total size of the btree entry based on the size of the weight, term tuple
+        int guess = 5 + 8 /*term overhead*/
+                      + guessTermSize(term, spec.getTextIndexVersion())
+                      + extraSize;
+
+        BSONObjBuilder b(guess);  // builds a BSON object with guess length.
+        for (unsigned k = 0; k < extrasBefore.size(); k++) {
+            b.appendAs(extrasBefore[k], "");
+        }
+        _appendIndexKey(b, weight, term, spec.getTextIndexVersion());
+        for (unsigned k = 0; k < extrasAfter.size(); k++) {
+            b.appendAs(extrasAfter[k], "");
+        }
+        BSONObj res = b.obj();
+
+        verify(guess >= res.objsize());
+
+        keys->insert(res);
+        keyBSONSize += res.objsize();
+
+        uassert(-1,
+                mongoutils::str::stream()
+                    << "trying to index text where term list is too big, max is "
+                    << MaxKeyBSONSizeMB << "mb " << obj["_id"],
+                keyBSONSize <= (MaxKeyBSONSizeMB * 1024 * 1024));
+    }
+}
+
 BSONObj FTSIndexFormat::getProximityIndexKey(const string& term,
                                              uint32_t pos,
                                              const BSONObj& indexPrefix) {
@@ -221,6 +332,20 @@ BSONObj FTSIndexFormat::getProximityIndexKey(const string& term,
     while (i.more())
         b.appendAs(i.next(), "");
     b.append("", term);
+    b.append("", pos);
+    return b.obj();
+}
+
+BSONObj FTSIndexFormat::getProximityIndexKey2(const string& term,
+                                              const RecordId& loc,
+                                              uint32_t pos,
+                                              const BSONObj& indexPrefix) {
+    BSONObjBuilder b;
+    BSONObjIterator i(indexPrefix);
+    while (i.more())
+        b.appendAs(i.next(), "");
+    b.append("", term);
+    b.append("", loc.repr());
     b.append("", pos);
     return b.obj();
 }

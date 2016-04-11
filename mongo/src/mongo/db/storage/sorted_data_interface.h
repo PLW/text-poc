@@ -99,6 +99,16 @@ public:
                           const RecordId& loc,
                           bool dupsAllowed) = 0;
 
+    // @@@prox : add variant method does not append loc to end of key
+    /*
+    virtual Status insert2(OperationContext* txn,
+                           const BSONObj& key,
+                           const RecordId& loc,
+                           bool dupsAllowed) {
+        return insert(txn, key, loc, dupsAllowed);
+    }
+    */
+
     /**
      * Remove the entry from the index with the specified key and RecordId.
      *

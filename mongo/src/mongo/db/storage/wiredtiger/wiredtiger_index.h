@@ -84,6 +84,14 @@ public:
                           const RecordId& id,
                           bool dupsAllowed);
 
+    // @@@prox : variant method that appends RecordId(0)
+    /*
+    virtual Status insert2(OperationContext* txn,
+                           const BSONObj& key,
+                           const RecordId& id,
+                           bool dupsAllowed);
+    */
+
     virtual void unindex(OperationContext* txn,
                          const BSONObj& key,
                          const RecordId& id,

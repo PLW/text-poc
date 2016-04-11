@@ -49,20 +49,24 @@ public:
         const BSONObj& document,
         BSONObjSet* keys);
 
-/*
     static void getKeys2(
         const FTSSpec& spec,
         const BSONObj& document,
-        BSONObjSet* keys,
-        const RecordId& loc);
-*/
+        const RecordId& loc,
+        BSONObjSet* keys);
 
-    // @@@proximity
+    // @@@prox : generate (term,pos) keys
     static void getKeysProximity(
         const FTSSpec& spec,
         const BSONObj& obj,
         BSONObjSet* keys);
-        //const RecordId& loc);
+
+    // @@@prox : generate (term,loc,pos) keys
+    static void getKeysProximity2(
+        const FTSSpec& spec,
+        const BSONObj& obj,
+        const RecordId& loc,
+        BSONObjSet* keys);
 
     /**
      * Helper method to get return entry from the FTSIndex as a BSONObj
@@ -80,6 +84,11 @@ public:
     static BSONObj getProximityIndexKey(const std::string& term,
                                         uint32_t pos,
                                         const BSONObj& indexPrefix);
+
+    static BSONObj getProximityIndexKey2(const std::string& term,
+                                         const RecordId& loc,
+                                         uint32_t pos,
+                                         const BSONObj& indexPrefix);
 
 private:
     /**

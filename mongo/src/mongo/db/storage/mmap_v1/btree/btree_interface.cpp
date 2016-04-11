@@ -88,6 +88,15 @@ public:
         return _btree->insert(txn, key, DiskLoc::fromRecordId(loc), dupsAllowed);
     }
 
+    // @@@prox : variant method that appends RecordId(0)
+    virtual Status insert2(OperationContext* txn,
+                           const BSONObj& key,
+                           const RecordId& loc,
+                           bool dupsAllowed) {
+        return _btree->insert(txn, key, DiskLoc::fromRecordId(RecordId(0)), dupsAllowed);
+    }
+
+
     virtual void unindex(OperationContext* txn,
                          const BSONObj& key,
                          const RecordId& loc,

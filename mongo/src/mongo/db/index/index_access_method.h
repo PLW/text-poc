@@ -77,11 +77,12 @@ public:
      *
      * The behavior of the insertion can be specified through 'options'.
      */
-    Status insert(OperationContext* txn,
-                  const BSONObj& obj,
-                  const RecordId& loc,
-                  const InsertDeleteOptions& options,
-                  int64_t* numInserted);
+    // @@@prox: add 'virtual'
+    virtual Status insert(OperationContext* txn,
+                          const BSONObj& obj,
+                          const RecordId& loc,
+                          const InsertDeleteOptions& options,
+                          int64_t* numInserted);
 
     /**
      * Analogous to above, but remove the records instead of inserting them.  If not NULL,
@@ -241,6 +242,11 @@ public:
      * Fills 'keys' with the keys that should be generated for 'obj' on this index.
      */
     virtual void getKeys(const BSONObj& obj, BSONObjSet* keys) const = 0;
+
+    // @@@prox : variant method which passes in RecordId
+    virtual void getKeys2(const BSONObj& obj, const RecordId& loc, BSONObjSet* keys) const {
+        return getKeys(obj, keys);
+    }
 
 protected:
     // Determines whether it's OK to ignore ErrorCodes::KeyTooLong for this OperationContext

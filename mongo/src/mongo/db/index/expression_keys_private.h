@@ -67,12 +67,12 @@ public:
      */
     static void getFTSKeys(const BSONObj& obj, const fts::FTSSpec& ftsSpec, BSONObjSet* keys);
 
-    // @@@proximity
+    // @@@proximity : add variant to pass through loc to key generator
     static void getFTSKeys2(
         const BSONObj& obj,
         const fts::FTSSpec& ftsSpec,
-        BSONObjSet* keys,
-        const RecordId& loc);
+        const RecordId& loc,
+        BSONObjSet* keys);
 
     /**
      * Generates keys for hash access method.

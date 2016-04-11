@@ -247,6 +247,27 @@ Status WiredTigerIndex::insert(OperationContext* txn,
     return _insert(c, key, id, dupsAllowed);
 }
 
+// @@@prox : variant method that appends RecordId(0)
+/*
+Status WiredTigerIndex::insert2(OperationContext* txn,
+                                const BSONObj& key,
+                                const RecordId& id,
+                                bool dupsAllowed) {
+    invariant(id.isNormal());
+    dassert(!hasFieldNames(key));
+
+    Status s = checkKeySize(key);
+    if (!s.isOK())
+        return s;
+
+    WiredTigerCursor curwrap(_uri, _tableId, false, txn);
+    curwrap.assertInActiveTxn();
+    WT_CURSOR* c = curwrap.get();
+
+    return _insert(c, key, RecordId(0), dupsAllowed);
+}
+*/
+
 void WiredTigerIndex::unindex(OperationContext* txn,
                               const BSONObj& key,
                               const RecordId& id,

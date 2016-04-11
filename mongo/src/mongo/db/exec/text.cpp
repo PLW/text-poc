@@ -64,7 +64,7 @@ TextStage::TextStage(OperationContext* txn,
                      const MatchExpression* filter)
     : PlanStage(kStageType, txn), _params(params) {
 
-    // @@@proximity
+    // @@@prox : check if we have a positional index
     if (params.spec.proximityIndex())
         _children.emplace_back(buildTextProximityTree( txn, ws, filter,
                                                         params.query.getProximityWindow(),
@@ -131,7 +131,7 @@ unique_ptr<PlanStage> TextStage::buildTextTree(OperationContext* txn,
     return treeRoot;
 }
 
-// @@@proximity
+// @@@prox : build TextProximity stage
 unique_ptr<PlanStage> TextStage::buildTextProximityTree(
     OperationContext* txn,
     WorkingSet* ws,
@@ -150,17 +150,19 @@ unique_ptr<PlanStage> TextStage::buildTextProximityTree(
 
         IndexScanParams ixparams;
 
-        ixparams.bounds.startKey = FTSIndexFormat::getProximityIndexKey(
-            term, 0, _params.indexPrefix);
+        // @@@prox : use variant that includes (recId,loc)
+        ixparams.bounds.startKey = FTSIndexFormat::getProximityIndexKey2(
+            term, RecordId(0), 0, _params.indexPrefix);
 
         if (t_debug)
-            std::cout << "startKey = (" << term << ", 0)" << std::endl;
+            std::cout << "startKey = (" << term << ",0,0)" << std::endl;
 
-        ixparams.bounds.endKey = FTSIndexFormat::getProximityIndexKey(
-            term, (1<<24), _params.indexPrefix);
+        // @@@prox : use variant that includes (recId,loc)
+        ixparams.bounds.endKey = FTSIndexFormat::getProximityIndexKey2(
+            term, RecordId::max(), (1<<30), _params.indexPrefix);
 
         if (t_debug)
-            std::cout << "endKey = (" << term << ", " << (1<<24) << ")" << std::endl;
+            std::cout << "endKey = (" << term << ",RecordId::Max()," << (1<<30) << ")" << std::endl;
 
         ixparams.bounds.endKeyInclusive = false;
         ixparams.bounds.isSimpleRange = true;

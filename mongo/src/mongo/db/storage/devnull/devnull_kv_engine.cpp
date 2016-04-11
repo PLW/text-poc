@@ -199,6 +199,16 @@ public:
         return Status::OK();
     }
 
+    // @@@prox : add variant method that does not append RecordId
+    /*
+    virtual Status insert2(OperationContext* txn,
+                           const BSONObj& key,
+                           const RecordId& loc,
+                           bool dupsAllowed) {
+        return Status::OK();
+    }
+    */
+
     virtual void unindex(OperationContext* txn,
                          const BSONObj& key,
                          const RecordId& loc,

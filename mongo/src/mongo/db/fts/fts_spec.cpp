@@ -94,7 +94,7 @@ FTSSpec::FTSSpec(const BSONObj& indexInfo) {
                                       << TEXT_INDEX_VERSION_2 << ", " << TEXT_INDEX_VERSION_1);
     }
 
-    // @@@proximity
+    // @@@prox : check for proximity index spec
     _proximityIndex = indexInfo["proximity"].boolean();
 
     // Initialize _defaultLanguage.  Note that the FTSLanguage constructor requires
@@ -171,7 +171,7 @@ const FTSLanguage* FTSSpec::_getLanguageToUseV2(const BSONObj& userDoc,
     return swl.getValue();
 }
 
-// @@@proximity
+// @@@prox : tokenize string value, stop words and all
 uint32_t FTSSpec::_scanString(FTSTokenizer* tokenizer,
                               uint32_t startPos,
                               StringData raw,
@@ -190,7 +190,7 @@ uint32_t FTSSpec::_scanString(FTSTokenizer* tokenizer,
     return termCount;
 }
 
-// @@@proximity
+// @@@prox : enum indexed fields, and tokenize them
 void FTSSpec::scanDocument(const BSONObj& obj, TermPositionMap* termPosMap) const {
 
     FTSElementIterator it(*this, obj);

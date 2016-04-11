@@ -30,17 +30,96 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/index/fts_access_method.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+//#include "mongo/db/client.h"
+//#include "mongo/db/curop.h"
+//#include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/index/expression_keys_private.h"
+#include "mongo/db/index/fts_access_method.h"
+//#include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context.h"
+//#include "mongo/db/storage/storage_options.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+const bool iam2_debug = false;
 
 FTSAccessMethod::FTSAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree)
     : IndexAccessMethod(btreeState, btree), _ftsSpec(btreeState->descriptor()->infoObj()) {}
 
 void FTSAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) const {
     ExpressionKeysPrivate::getFTSKeys(obj, _ftsSpec, keys);
+}
+
+// @@@prox : add variant method 'getKeys2'
+void FTSAccessMethod::getKeys2(const BSONObj& obj, const RecordId& loc, BSONObjSet* keys) const {
+    ExpressionKeysPrivate::getFTSKeys2(obj, _ftsSpec, loc, keys);
+}
+
+// @@@prox : implement 'insert' method
+// Find the keys for obj, put them in the tree pointing to loc
+Status FTSAccessMethod::insert(OperationContext* txn,
+                               const BSONObj& obj,
+                               const RecordId& loc,
+                               const InsertDeleteOptions& options,
+                               int64_t* numInserted) {
+    *numInserted = 0;
+
+    BSONObjSet keys;
+    // Delegate to the subclass.
+    getKeys2(obj, loc, &keys);
+
+    // @@@proximity : add debugging output
+    if (iam2_debug)
+        std::cout << "-----------------------------" << std::endl;
+
+    Status ret = Status::OK();
+    for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
+        Status status = _newInterface->insert(txn, *i, loc, options.dupsAllowed);
+                                          // @@@prox : insert2(..)
+
+        // @@@proximity : add debugging output
+        if (iam2_debug)
+            std::cout << "index insert(" << loc.repr()
+                      << ", " << i->toString(0,0) << ")" << std::endl;
+
+        // Everything's OK, carry on.
+        if (status.isOK()) {
+            ++*numInserted;
+            continue;
+        }
+
+        // Error cases.
+
+        if (status.code() == ErrorCodes::KeyTooLong && ignoreKeyTooLong(txn)) {
+            continue;
+        }
+
+        if (status.code() == ErrorCodes::DuplicateKeyValue) {
+            // A document might be indexed multiple times during a background index build
+            // if it moves ahead of the collection scan cursor (e.g. via an update).
+            if (!_btreeState->isReady(txn)) {
+                LOG(3) << "key " << *i << " already in index during background indexing (ok)";
+                continue;
+            }
+        }
+
+        // Clean up after ourselves.
+        for (BSONObjSet::const_iterator j = keys.begin(); j != i; ++j) {
+            removeOneKey(txn, *j, loc, options.dupsAllowed);
+            *numInserted = 0;
+        }
+
+        return status;
+    }
+
+    if (*numInserted > 1) {
+        _btreeState->setMultikey(txn);
+    }
+
+    return ret;
 }
 
 }  // namespace mongo

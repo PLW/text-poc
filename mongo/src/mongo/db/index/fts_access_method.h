@@ -49,6 +49,16 @@ private:
     // Implemented:
     virtual void getKeys(const BSONObj& obj, BSONObjSet* keys) const;
 
+    // @@@prox : add variant method 'getKeys2'
+    virtual void getKeys2(const BSONObj& obj, const RecordId& loc, BSONObjSet* keys) const;
+
+    // @@@proximity : implement 'insert' method
+    Status insert(OperationContext* txn,
+                  const BSONObj& obj,
+                  const RecordId& loc,
+                  const InsertDeleteOptions& options,
+                  int64_t* numInserted);
+
     fts::FTSSpec _ftsSpec;
 };
 

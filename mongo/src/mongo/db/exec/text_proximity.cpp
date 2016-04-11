@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+// @@@prox : text proximity exec stage implementation
+
 #include "mongo/db/exec/text_proximity.h"
 
 #include <map>
@@ -337,9 +339,15 @@ void TextProximityStage::collectResults() {
 
     // sort the entire working set and process runs of common RecordIds
     std::sort(_posv.begin(), _posv.end(), proximitySort);
+
     std::vector<TextRecordData>::const_iterator it2 = _posv.begin();
 
     for (; it2 != _posv.end(); ++it2) {
+
+        if (tp_debug)
+            std::cout << "_posv -> (" << it2->term << ","
+                      << it2->recId << "," << it2->pos << ")" << std::endl; 
+
         if (it2->recId != recId) {
             // we have a run of common recordIds stored in runv.
             termperm->clear();
@@ -363,8 +371,8 @@ void TextProximityStage::collectResults() {
 
                     if (tp_debug) {
                         for (uint32_t z = 0; z<depth; ++z) std::cout << ' ';
-                        std::cout << "(id, term, pos) = (" << recId << ", "
-                                  << term << ", " << termPos << ")" << std::endl;
+                        std::cout << "(term, id, pos) = (" << term << ", "
+                                  << recId << ", " << termPos << ")" << std::endl;
                     }
 
                     width += (termPos - pos);
@@ -486,7 +494,8 @@ PlanStage::StageState TextProximityStage::addTerm(WorkingSetID wsid, WorkingSetI
     invariant(wsm->getState() == WorkingSetMember::RID_AND_IDX);
     invariant(1 == wsm->keyData.size());
     IndexKeyDatum newKeyData = wsm->keyData.back();  // copy to keep it around.
-    uint64_t loc = wsm->recordId.repr();
+
+    //uint64_t loc = wsm->recordId.repr();
     TextRecordData* textRecordData = &_posMap[wsm->recordId];
 
     if (textRecordData->rejected) {
@@ -576,12 +585,13 @@ PlanStage::StageState TextProximityStage::addTerm(WorkingSetID wsid, WorkingSetI
         // old one. Note that since we don't keep all index keys, we could get a score that doesn't
         // match the document, but this has always been a problem.
         // TODO something to improve the situation.
+        // @@@prox : this situation affects proximity relevance
         invariant(wsid != textRecordData->wsid);
         _ws->free(wsid);
         wsm = _ws->get(textRecordData->wsid);
     }
 
-    // compound key {prefix,term,pos}.
+    // compound key {prefix,term,loc,pos}.
     BSONObjIterator keyIt(newKeyData.keyData);
     for (unsigned i = 0; i < _params.spec.numExtraBefore(); i++) {
         keyIt.next();
@@ -589,6 +599,9 @@ PlanStage::StageState TextProximityStage::addTerm(WorkingSetID wsid, WorkingSetI
 
     BSONElement termElement = keyIt.next();
     std::string term = termElement.String();
+
+    BSONElement locElement = keyIt.next();
+    uint64_t loc = (uint64_t)locElement.Long();
 
     BSONElement posElement = keyIt.next();
     uint32_t pos = (uint32_t)posElement.Int();
